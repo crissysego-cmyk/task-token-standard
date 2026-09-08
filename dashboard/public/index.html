@@ -325,7 +325,7 @@ fetch("/api/info").then(r => r.json()).then(info => {
 
   // Interfaces
   document.getElementById("interfaces-info").innerHTML = info.interfaces.map(i =>
-    `<div class="info-row"><span class="key">${i.name}</span><span class="val">${i.id}</span></div>`
+    `<div class="info-row"><span class="key">${i.name}</span><span class="val">${i.id}${i.note ? '<br><span style="font-size:11px;color:var(--text-dim)">' + i.note + '</span>' : ''}</span></div>`
   ).join("");
 
   // Deployment table

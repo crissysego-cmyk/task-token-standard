@@ -114,6 +114,7 @@ function getProjectInfo() {
       { name: "ITaskTender", id: "0xc319d532" },
       { name: "ITaskVerifier", id: "0x9977db15" },
       { name: "IOnchainTaskDocument", id: "0xeb078d05" },
+      { name: "ITaskStatus", id: "0x0b42ebe6", note: "Todo → InProgress → Finished" },
     ],
     deployments: [
       { id: 1, example: "vectors/public-v1", judgment: "Judged (N=1)", outcome: "Frozen and funded; live reference tender" },
