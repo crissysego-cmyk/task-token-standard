@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Task Token Standard — Reference Implementation</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2128;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d29922;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.6;
+    padding: 0;
+  }
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+  /* Header */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 48px 0 36px;
+    background: linear-gradient(180deg, #0d1117 0%, #161b22 100%);
+  }
+  header h1 { font-size: 28px; font-weight: 650; letter-spacing: -0.5px; }
+  header .subtitle { color: var(--text-dim); font-size: 15px; margin-top: 6px; }
+  header .badges { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .badge {
+    font-size: 12px;
+    font-family: var(--mono);
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    background: var(--surface);
+  }
+  .badge.kernel { color: var(--accent); border-color: rgba(88,166,255,0.4); }
+
+  /* Summary cards */
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 32px 0; }
+  @media (max-width: 700px) { .cards { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .card .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-dim); }
+  .card .value { font-size: 32px; font-weight: 700; margin-top: 6px; font-family: var(--mono); }
+  .card .detail { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+  .card .value.pass { color: var(--green); }
+  .card .value.fail { color: var(--red); }
+  .card .value.pending { color: var(--yellow); }
+
+  /* Sections */
+  section { margin: 36px 0; }
+  section h2 {
+    font-size: 18px; font-weight: 650; margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  section h2 .count {
+    font-size: 13px; font-weight: 400; color: var(--text-dim);
+    font-family: var(--mono);
+  }
+
+  /* Result blocks */
+  .result {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .result-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .result-header:hover { background: var(--surface2); }
+  .result-title { display: flex; align-items: center; gap: 10px; }
+  .result-title .icon { font-size: 18px; }
+  .result-title .name { font-weight: 600; font-size: 15px; }
+  .result-title .desc { font-size: 13px; color: var(--text-dim); }
+  .result-status {
+    font-size: 12px; font-family: var(--mono); font-weight: 600;
+    padding: 3px 12px; border-radius: 20px;
+  }
+  .result-status.pass { color: var(--green); background: rgba(63,185,80,0.12); }
+  .result-status.fail { color: var(--red); background: rgba(248,81,73,0.12); }
+  .result-status.pending { color: var(--yellow); background: rgba(210,153,34,0.12); }
+  .result-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    padding: 14px 18px;
+    background: #0d1117;
+  }
+  .result.open .result-body { display: block; }
+  .result-body pre {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text-dim);
+  }
+  .result-body pre .ok { color: var(--green); }
+  .result-body pre .fail { color: var(--red); }
+  .result-body pre .pass { color: var(--green); font-weight: bold; }
+
+  /* E2E live output */
+  .e2e-output {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    max-height: 500px;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text-dim);
+  }
+  .e2e-output .ok { color: var(--green); }
+  .e2e-output .fail { color: var(--red); }
+  .e2e-output .summary { color: var(--accent); font-weight: bold; }
+
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--yellow);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Info tables */
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .info-grid { grid-template-columns: 1fr; } }
+  .info-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+  }
+  .info-block h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--accent); }
+  .info-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-row .key { color: var(--text-dim); }
+  .info-row .val { font-family: var(--mono); }
+
+  /* Deployment table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  th { color: var(--text-dim); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  td { font-family: var(--mono); font-size: 12.5px; }
+  td:nth-child(4) { font-family: var(--sans); color: var(--text-dim); }
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow-x: auto;
+  }
+
+  /* Description block */
+  .desc-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+  .desc-block .formula {
+    font-family: var(--mono);
+    color: var(--accent);
+    margin-top: 12px;
+    font-size: 13px;
+  }
+
+  footer { text-align: center; padding: 40px 0; color: var(--text-dim); font-size: 13px; border-top: 1px solid var(--border); margin-top: 40px; }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <h1>Task Token as a Reverse Asset</h1>
+    <div class="subtitle">Reference Implementation &amp; Deterministic Toolchain</div>
+    <div class="badges">
+      <span class="badge kernel">TASK-KERNEL v3.0</span>
+      <span class="badge">ERC Draft · erc-9999</span>
+      <span class="badge">solc 0.8.24</span>
+      <span class="badge">CC0-1.0</span>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Summary cards -->
+  <div class="cards" id="cards">
+    <div class="card">
+      <div class="label">Vector Verification</div>
+      <div class="value pending" id="card-verify">—</div>
+      <div class="detail" id="card-verify-detail">Running...</div>
+    </div>
+    <div class="card">
+      <div class="label">E2E Lifecycle Test</div>
+      <div class="value pending" id="card-e2e">—</div>
+      <div class="detail" id="card-e2e-detail">Pending</div>
+    </div>
+    <div class="card">
+      <div class="label">Contracts</div>
+      <div class="value" style="color:var(--accent)" id="card-contracts">4</div>
+      <div class="detail">solc 0.8.24 · optimizer on</div>
+    </div>
+  </div>
+
+  <!-- Description -->
+  <section>
+    <div class="desc-block" id="desc">
+      Loading project info...
+    </div>
+  </section>
+
+  <!-- Vector verification -->
+  <section>
+    <h2>Vector Verification <span class="count" id="verify-count"></span></h2>
+    <div id="verify-results"></div>
+  </section>
+
+  <!-- E2E test -->
+  <section>
+    <h2>E2E Lifecycle Test <span class="count">solc-js + ganache + ethers · 108 assertions</span></h2>
+    <div class="e2e-output" id="e2e-output">Waiting for test to start...</div>
+  </section>
+
+  <!-- Contract info -->
+  <section>
+    <h2>Contract &amp; Interface Info</h2>
+    <div class="info-grid" id="info-grid">
+      <div class="info-block"><h3>Deployed Contracts</h3><div id="contracts-info">Loading...</div></div>
+      <div class="info-block"><h3>ERC-165 Interface IDs</h3><div id="interfaces-info">Loading...</div></div>
+    </div>
+  </section>
+
+  <!-- Sepolia deployment -->
+  <section>
+    <h2>Sepolia Reference Deployment <span class="count">7 tokens · 1 contract</span></h2>
+    <div class="table-wrap" id="deploy-table">Loading...</div>
+  </section>
+
+</div>
+
+<footer>
+  <div class="container">
+    <a href="https://github.com/garyyang-finchip/task-token-standard" target="_blank" rel="noopener">github.com/garyyang-finchip/task-token-standard</a>
+  </div>
+</footer>
+
+<script>
+// ── Helpers ────────────────────────────────────────────────────────────────
+function statusIcon(passed) {
+  return passed ? "✓" : "✗";
+}
+function escapeHtml(s) {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+function highlightOutput(text) {
+  return escapeHtml(text)
+    .replace(/(\[OK\][^\n]*)/g, '<span class="ok">$1</span>')
+    .replace(/(\[FAIL\][^\n]*)/g, '<span class="fail">$1</span>')
+    .replace(/(PASS[^\n]*)/g, '<span class="pass">$1</span>')
+    .replace(/(FAIL:[^\n]*)/g, '<span class="fail">$1</span>');
+}
+
+// ── Load project info ──────────────────────────────────────────────────────
+fetch("/api/info").then(r => r.json()).then(info => {
+  document.getElementById("desc").innerHTML = `
+    <p>${info.description}</p>
+    <div class="formula">
+      Supply side (ERC-8338):&nbsp;&nbsp; T(f(v), $)&nbsp;&nbsp;= ($, v)&nbsp;&nbsp; the seller moves first<br>
+      Demand side (this):&nbsp;&nbsp;&nbsp;&nbsp; T(v, f⁻¹($)) = ($, v)&nbsp;&nbsp; the buyer moves first<br>
+      Together:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; T(f(v), f⁻¹($)) = ($, v)&nbsp;&nbsp; the agent economy, bidirectionally complete
+    </div>
+  `;
+
+  // Contracts
+  document.getElementById("contracts-info").innerHTML = info.contracts.map(c =>
+    `<div class="info-row"><span class="key">${c.name}</span><span class="val">${c.size}<br><span style="font-size:11px;color:var(--text-dim)">${c.note}</span></span></div>`
+  ).join("");
+
+  // Interfaces
+  document.getElementById("interfaces-info").innerHTML = info.interfaces.map(i =>
+    `<div class="info-row"><span class="key">${i.name}</span><span class="val">${i.id}${i.note ? '<br><span style="font-size:11px;color:var(--text-dim)">' + i.note + '</span>' : ''}</span></div>`
+  ).join("");
+
+  // Deployment table
+  document.getElementById("deploy-table").innerHTML = `
+    <table>
+      <thead><tr><th>#</th><th>Example</th><th>Judgment</th><th>Outcome</th></tr></thead>
+      <tbody>
+        ${info.deployments.map(d => `
+          <tr>
+            <td>${d.id}</td>
+            <td>${d.example}</td>
+            <td>${d.judgment}</td>
+            <td>${d.outcome}</td>
+          </tr>`).join("")}
+      </tbody>
+    </table>`;
+});
+
+// ── Load verification results ───────────────────────────────────────────────
+fetch("/api/verify").then(r => r.json()).then(results => {
+  if (!results) return;
+  const passed = results.filter(r => r.passed).length;
+  const total = results.length;
+  const card = document.getElementById("card-verify");
+  card.textContent = `${passed}/${total}`;
+  card.className = `value ${passed === total ? "pass" : "fail"}`;
+  document.getElementById("card-verify-detail").textContent =
+    passed === total ? "All vectors verified" : `${total - passed} failed`;
+
+  document.getElementById("verify-count").textContent = `${passed}/${total} passed`;
+
+  document.getElementById("verify-results").innerHTML = results.map((r, i) => `
+    <div class="result" id="v${i}">
+      <div class="result-header" onclick="document.getElementById('v${i}').classList.toggle('open')">
+        <div class="result-title">
+          <span class="icon" style="color:${r.passed ? 'var(--green)' : 'var(--red)'}">${statusIcon(r.passed)}</span>
+          <div>
+            <div class="name">${r.label}</div>
+            <div class="desc">${r.desc}</div>
+          </div>
+        </div>
+        <span class="result-status ${r.passed ? "pass" : "fail"}">${r.passed ? "PASS" : "FAIL"}</span>
+      </div>
+      <div class="result-body">
+        <pre>${highlightOutput(r.output)}</pre>
+      </div>
+    </div>`).join("");
+});
+
+// ── Poll E2E status ────────────────────────────────────────────────────────
+function pollE2E() {
+  fetch("/api/e2e").then(r => r.json()).then(state => {
+    const card = document.getElementById("card-e2e");
+    const detail = document.getElementById("card-e2e-detail");
+    const output = document.getElementById("e2e-output");
+
+    if (state.status === "pending") {
+      card.textContent = "—";
+      card.className = "value pending";
+      detail.textContent = "Pending";
+      output.textContent = "Waiting for test to start...";
+    } else if (state.status === "running") {
+      card.innerHTML = '<span class="spinner"></span>';
+      card.className = "value pending";
+      detail.textContent = "Running...";
+      output.innerHTML = highlightOutput(state.output || "Compiling contracts...");
+      setTimeout(pollE2E, 2000);
+    } else {
+      if (state.summary) {
+        const allPassed = state.summary.failed === 0;
+        card.textContent = `${state.summary.passed}`;
+        card.className = `value ${allPassed ? "pass" : "fail"}`;
+        detail.textContent = `${state.summary.passed} passed, ${state.summary.failed} failed`;
+      } else {
+        card.textContent = state.status === "passed" ? "✓" : "✗";
+        card.className = `value ${state.status === "passed" ? "pass" : "fail"}`;
+        detail.textContent = state.status;
+      }
+      output.innerHTML = highlightOutput(state.output || "No output");
+      // Auto-scroll to bottom
+      output.scrollTop = output.scrollHeight;
+    }
+  });
+}
+pollE2E();
+</script>
+</body>
+</html>

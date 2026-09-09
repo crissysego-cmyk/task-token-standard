@@ -8,6 +8,7 @@ import {ITaskToken} from "../contracts/interfaces/ITaskToken.sol";
 import {ITaskTender} from "../contracts/interfaces/ITaskTender.sol";
 import {ITaskVerifier} from "../contracts/interfaces/ITaskVerifier.sol";
 import {IOnchainTaskDocument} from "../contracts/interfaces/IOnchainTaskDocument.sol";
+import {ITaskStatus} from "../contracts/interfaces/ITaskStatus.sol";
 import {HashlockVerifier} from "../contracts/verifiers/HashlockVerifier.sol";
 import {JuryPanel} from "../contracts/judgment/JuryPanel.sol";
 
@@ -158,6 +159,8 @@ contract TaskTokenTest is Test {
         t.submissionCountOf(42);
         vm.expectRevert();
         t.hasOnchainTaskDocument(42);
+        vm.expectRevert();
+        t.taskStatusOf(42);
     }
 
     // ---------------- vault lock: the standard's most sensitive invariant
@@ -664,5 +667,35 @@ contract TaskTokenTest is Test {
         t.setTaskURI(id, "ar://elsewhere");
         assertEq(t.taskOf(id).version, 1);
         assertEq(t.taskURI(id), "ar://elsewhere");
+    }
+
+    // ---------------- task status: Todo → InProgress → Finished
+    function test_task_status_default_todo() public {
+        uint256 id = mintDefault();
+        assertEq(uint8(t.taskStatusOf(id)), uint8(ITaskStatus.TaskStatus.Todo));
+    }
+
+    function test_task_status_owner_can_set() public {
+        uint256 id = mintDefault();
+        vm.prank(owner);
+        t.setTaskStatus(id, ITaskStatus.TaskStatus.InProgress);
+        assertEq(uint8(t.taskStatusOf(id)), uint8(ITaskStatus.TaskStatus.InProgress));
+        vm.prank(owner);
+        t.setTaskStatus(id, ITaskStatus.TaskStatus.Finished);
+        assertEq(uint8(t.taskStatusOf(id)), uint8(ITaskStatus.TaskStatus.Finished));
+    }
+
+    function test_task_status_non_owner_blocked() public {
+        uint256 id = mintDefault();
+        vm.prank(publisher);
+        vm.expectRevert();
+        t.setTaskStatus(id, ITaskStatus.TaskStatus.InProgress);
+        vm.prank(worker);
+        vm.expectRevert();
+        t.setTaskStatus(id, ITaskStatus.TaskStatus.Finished);
+    }
+
+    function test_task_status_supports_interface() public {
+        assertTrue(t.supportsInterface(type(ITaskStatus).interfaceId));
     }
 }
