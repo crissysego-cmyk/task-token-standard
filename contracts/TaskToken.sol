@@ -5,7 +5,6 @@ import {ITaskToken} from "./interfaces/ITaskToken.sol";
 import {ITaskTender} from "./interfaces/ITaskTender.sol";
 import {ITaskVerifier} from "./interfaces/ITaskVerifier.sol";
 import {IOnchainTaskDocument} from "./interfaces/IOnchainTaskDocument.sol";
-import {ITaskStatus} from "./interfaces/ITaskStatus.sol";
 import {TaskVault} from "./TaskVault.sol";
 
 interface IERC20Minimal {
@@ -21,7 +20,7 @@ interface IERC165Probe {
 ///         (TASK-KERNEL v3.0). Self-contained minimal ERC-721 + all interfaces,
 ///         deploying one locked TaskVault per token.
 /// @notice Reference quality: favors clarity and 1:1 spec traceability over gas.
-contract TaskToken is ITaskToken, ITaskTender, IOnchainTaskDocument, ITaskStatus {
+contract TaskToken is ITaskToken, ITaskTender, IOnchainTaskDocument {
 
     // ---------------------------------------------------------------- ERC-721 core
     string public name;
@@ -37,7 +36,6 @@ contract TaskToken is ITaskToken, ITaskTender, IOnchainTaskDocument, ITaskStatus
     mapping(uint256 => string)  private _taskURI;         // transport hint, outside identity
     mapping(uint256 => address) private _updateAuthority; // publication right, outside ownership
     mapping(uint256 => bool)    private _frozen;
-    mapping(uint256 => TaskStatus) private _taskStatus;
 
     // -------------------------------------------------------------- Tender layer
     mapping(uint256 => TenderTerms)  private _terms;               // immutable after mint
@@ -114,8 +112,7 @@ contract TaskToken is ITaskToken, ITaskTender, IOnchainTaskDocument, ITaskStatus
             || id == 0x5b5e139f                              // ERC-721 Metadata
             || id == type(ITaskToken).interfaceId
             || id == type(ITaskTender).interfaceId
-            || id == type(IOnchainTaskDocument).interfaceId
-            || id == type(ITaskStatus).interfaceId;
+            || id == type(IOnchainTaskDocument).interfaceId;
     }
 
     // =============================================================== mint
@@ -163,7 +160,6 @@ contract TaskToken is ITaskToken, ITaskTender, IOnchainTaskDocument, ITaskStatus
         _acceptanceAuthority[tokenId] = acceptanceAuthority_;
         _terms[tokenId] = terms;
         _vault[tokenId] = new TaskVault(); // the money lives IN the token
-        _taskStatus[tokenId] = TaskStatus.Todo;
 
         emit TaskUpdated(tokenId, tdHash, taskHash, 1);
         emit TaskUpdateAuthorityChanged(tokenId, address(0), updateAuthority_);
@@ -185,21 +181,6 @@ contract TaskToken is ITaskToken, ITaskTender, IOnchainTaskDocument, ITaskStatus
 
     function isTaskFrozen(uint256 tokenId) external view exists(tokenId) returns (bool) {
         return _frozen[tokenId];
-    }
-
-    // =============================================================== ITaskStatus
-    function taskStatusOf(uint256 tokenId) external view exists(tokenId) returns (TaskStatus) {
-        return _taskStatus[tokenId];
-    }
-
-    /// @notice Set the task's project-management status. Only the token owner.
-    ///         Free movement between Todo, InProgress, and Finished — no
-    ///         transition restrictions, no effect on settlement or refunds.
-    function setTaskStatus(uint256 tokenId, TaskStatus status) external exists(tokenId) {
-        require(msg.sender == ownerOf(tokenId), "TaskToken: not owner");
-        TaskStatus prev = _taskStatus[tokenId];
-        _taskStatus[tokenId] = status;
-        emit TaskStatusChanged(tokenId, prev, status);
     }
 
     // =============================================================== ITaskToken mutations
