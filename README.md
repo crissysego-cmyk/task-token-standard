@@ -337,6 +337,19 @@ package settles a task by pointing `resultHash` at that package's `packageHash` 
 reverse asset retires into a forward asset, and the trade `T(f(v), f⁻¹($)) = ($, v)`
 clears entirely on-chain.
 
+## Acknowledgments
+
+First-round review on the Ethereum Magicians thread materially improved this draft:
+
+- **chugarchugarr** identified that the Package Boundary clause promised more than the
+  design delivers, and supplied the correct scoping — the TaskRoot commits everything
+  that *defines* how work is to be judged, never the live state that judgment is later
+  performed in. The amended normative text adopts his resolution.
+- **babyblueviper1** independently verified the Sepolia deployment by raw `eth_call`
+  ("real, not vaporware"), surfaced the verifier-kind disclosure gap now recorded in
+  Security Considerations, reframed `judgmentFee` as the price of one recomputable
+  ruling (see ROADMAP.md), and proposed the judgment-execution attestation companion.
+
 ## License
 
 Specification and reference code released under [CC0](LICENSE).
